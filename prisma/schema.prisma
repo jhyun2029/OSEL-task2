@@ -1,0 +1,147 @@
+// Prisma schema for the Researcher Task Management MVP.
+//
+// Scope note: this schema intentionally only models what the MVP needs
+// (User / Project / Task / PlanStep / ActivityLog). Fields and models for
+// v1.1+ features (Workspace, Membership, File, Version, ResearchTopic,
+// WeeklyReport, Insight, comments) are NOT created yet — see README.md and
+// TODO.md for the planned extension points instead of speculative columns.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// A single researcher. The MVP is single-user-per-workspace in practice
+// (no auth yet — see TODO.md) but Task/Project already carry an ownerId so
+// multi-user support (v1.1 team sharing) can be layered on without a
+// migration that reshapes existing data.
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  projects  Project[]
+  tasks     Task[]
+  activityLogs ActivityLog[]
+}
+
+// Lightweight project/research-topic grouping for tasks. This stands in for
+// the PRD's fuller "Project / Research Topic" concept — kept minimal for
+// the MVP.
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  color       String?  // for calendar/list UI badges
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  tasks Task[]
+}
+
+// SQLite has no native enum type, so Prisma can't use `enum` here (it only
+// supports enums on Postgres/MySQL/etc.). These fields are plain Strings at
+// the DB layer; the allowed values are enforced in application code — see
+// src/lib/enums.ts (the single source of truth for the value sets) and the
+// zod schemas in src/lib/validation.ts. Comments below document the values.
+
+// importance: URGENT(긴급) | HIGH(높음) | NORMAL(보통) | LOW(낮음)
+// status:     PLANNED(예정) | IN_PROGRESS(진행중) | ON_HOLD(보류) | DELAYED(지연) | DONE(완료)
+//
+// PRD §4.1 visibility field. Only PRIVATE is actually usable in the MVP UI;
+// TEAM_SHARED exists on the schema so v1.1 (workspace/team sharing) doesn't
+// require a breaking migration, but no workspace/membership model backs it
+// yet, so the UI stubs it out (disabled option, see TODO.md).
+// visibility: PRIVATE(개인 전용) | TEAM_SHARED(팀 공유, 준비 중)
+
+model Task {
+  id          String  @id @default(cuid())
+  title       String
+  description String?
+  tags        String? // comma-separated tags (simple MVP representation)
+  importance  String  @default("NORMAL")
+  status      String  @default("PLANNED")
+
+  // Manual progress override. When null, progress is derived from PlanStep
+  // completion ratio (see lib/progress.ts). When set, the manual value wins.
+  progressPercent Int?
+
+  startDate DateTime?
+  dueDate   DateTime?
+
+  visibility String @default("PRIVATE")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  planSteps    PlanStep[]
+  activityLogs ActivityLog[]
+
+  @@index([ownerId])
+  @@index([projectId])
+  @@index([dueDate])
+  @@index([status])
+}
+
+// A single step within a task's progress plan (PRD §4.2 진행 계획).
+model PlanStep {
+  id        String   @id @default(cuid())
+  title     String
+  order     Int      @default(0)
+  isDone    Boolean  @default(false)
+
+  // Planned duration, so "plan vs. actual" comparisons are possible later.
+  plannedStartDate DateTime?
+  plannedEndDate   DateTime?
+  completedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+
+// type: CREATED | STATUS_CHANGED | PROGRESS_CHANGED | PLAN_STEP_ADDED
+//     | PLAN_STEP_COMPLETED | PLAN_STEP_REOPENED | UPDATED  (see lib/enums.ts)
+
+// Append-only history of status/progress changes (PRD §4.3 상태변경 이력 로그).
+model ActivityLog {
+  id        String   @id @default(cuid())
+  type      String
+  message   String
+  metadata  String? // JSON-encoded extra detail (e.g. {"from":"PLANNED","to":"IN_PROGRESS"})
+  createdAt DateTime @default(now())
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  actorId String?
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+}
+
+// --- Deliberately NOT modeled in the MVP (v1.1+, see PRD roadmap) ---
+// Workspace, Membership          -> team sharing / workspace dashboards (v1.1)
+// Comment                        -> collaboration (v1.1)
+// File, FileVersion              -> experiment/manuscript file + version mgmt (v1.3)
+// ResearchTopic, WeeklyReport,
+// Insight                        -> weekly report rollups + AI insight (v1.4 / v2.1)
