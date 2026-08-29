@@ -16,7 +16,7 @@ import {
   startOfWeek,
 } from "date-fns";
 import { ko } from "date-fns/locale";
-import type { TaskDto } from "@/lib/types";
+import type { TaskDto, UserDto } from "@/lib/types";
 import { isTaskOnDay } from "@/lib/calendar";
 import { ImportanceBadge, StatusBadge } from "@/components/Badges";
 import { TASK_STATUS_LABELS, TASK_STATUS_ORDER } from "@/lib/constants";
@@ -24,10 +24,28 @@ import { TASK_STATUS_LABELS, TASK_STATUS_ORDER } from "@/lib/constants";
 type ViewMode = "month" | "week" | "day" | "list";
 
 const WEEK_STARTS_ON = 0; // Sunday
+const ALL = "ALL";
 
-export default function CalendarClient({ tasks }: { tasks: TaskDto[] }) {
+export default function CalendarClient({
+  tasks: allTasks,
+  users,
+  currentUserId,
+}: {
+  tasks: TaskDto[];
+  users: UserDto[];
+  currentUserId: string;
+}) {
   const [view, setView] = useState<ViewMode>("month");
   const [cursor, setCursor] = useState(() => new Date());
+  const [ownerFilter, setOwnerFilter] = useState<string>(ALL);
+
+  const tasks = useMemo(
+    () =>
+      ownerFilter === ALL
+        ? allTasks
+        : allTasks.filter((t) => t.ownerId === ownerFilter),
+    [allTasks, ownerFilter]
+  );
 
   const title = useMemo(() => {
     if (view === "month") return format(cursor, "yyyy년 M월", { locale: ko });
@@ -65,6 +83,22 @@ export default function CalendarClient({ tasks }: { tasks: TaskDto[] }) {
           )}
           <h2 className="ml-2 text-base font-semibold text-slate-800">{title}</h2>
         </div>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            연구원
+            <select
+              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
+              value={ownerFilter}
+              onChange={(e) => setOwnerFilter(e.target.value)}
+            >
+              <option value={ALL}>전체</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.id === currentUserId ? `${u.name} (나)` : u.name}
+                </option>
+              ))}
+            </select>
+          </label>
         <div className="flex gap-1 rounded-md border border-slate-200 bg-white p-1">
           {(["month", "week", "day", "list"] as ViewMode[]).map((v) => (
             <button
@@ -77,6 +111,7 @@ export default function CalendarClient({ tasks }: { tasks: TaskDto[] }) {
               {{ month: "월", week: "주", day: "일", list: "리스트" }[v]}
             </button>
           ))}
+        </div>
         </div>
       </div>
 
@@ -192,6 +227,9 @@ function DayView({ cursor, tasks }: { cursor: Date; tasks: TaskDto[] }) {
                   {t.title}
                 </Link>
                 <div className="mt-1 flex gap-1.5">
+                  <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                    {t.owner.name}
+                  </span>
                   <ImportanceBadge value={t.importance} />
                   <StatusBadge value={t.status} />
                 </div>
@@ -234,6 +272,9 @@ function ListView({ tasks }: { tasks: TaskDto[] }) {
                     {t.title}
                   </Link>
                   <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                      {t.owner.name}
+                    </span>
                     <ImportanceBadge value={t.importance} />
                     {t.dueDate && (
                       <span className="text-xs text-slate-400">
@@ -257,9 +298,9 @@ function TaskChip({ task }: { task: TaskDto }) {
     <Link
       href={`/tasks/${task.id}`}
       className="block truncate rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-700 hover:bg-slate-200"
-      title={task.title}
+      title={`${task.owner.name} · ${task.title}`}
     >
-      {task.title}
+      <span className="text-slate-400">{task.owner.name}</span> {task.title}
     </Link>
   );
 }

@@ -42,6 +42,11 @@ export type ProjectDto = {
   _count?: { tasks: number };
 };
 
+export type UserDto = {
+  id: string;
+  name: string;
+};
+
 export type TaskDto = {
   id: string;
   title: string;
@@ -57,6 +62,7 @@ export type TaskDto = {
   createdAt: string;
   updatedAt: string;
   ownerId: string;
+  owner: UserDto;
   projectId: string | null;
   project: ProjectDto | null;
   planSteps: PlanStepDto[];

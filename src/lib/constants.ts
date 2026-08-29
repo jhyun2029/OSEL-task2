@@ -46,7 +46,7 @@ export const TASK_STATUS_BADGE_CLASS: Record<TaskStatus, string> = {
 
 export const VISIBILITY_LABELS: Record<Visibility, string> = {
   PRIVATE: "개인 전용",
-  TEAM_SHARED: "팀 공유 (준비 중)",
+  TEAM_SHARED: "팀 공유",
 };
 
 export const ACTIVITY_TYPE_LABELS: Record<ActivityType, string> = {

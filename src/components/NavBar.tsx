@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { UserDto } from "@/lib/types";
+import UserPicker from "@/components/UserPicker";
 
 const LINKS = [
   { href: "/tasks", label: "할 일 목록" },
@@ -9,8 +11,17 @@ const LINKS = [
   { href: "/projects", label: "프로젝트" },
 ];
 
-export default function NavBar() {
+export default function NavBar({
+  users,
+  currentUserId,
+}: {
+  users: UserDto[];
+  currentUserId: string;
+}) {
   const pathname = usePathname();
+
+  // 접속 코드 입력 화면에서는 멤버 이름 등이 노출되지 않게 내비게이션을 숨긴다.
+  if (pathname === "/gate") return null;
 
   return (
     <header className="border-b border-slate-200 bg-white">
@@ -18,24 +29,27 @@ export default function NavBar() {
         <Link href="/tasks" className="text-lg font-semibold text-slate-900">
           연구원 업무 관리
         </Link>
-        <nav className="flex gap-1">
-          {LINKS.map((link) => {
-            const active = pathname?.startsWith(link.href);
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  active
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <div className="flex items-center gap-4">
+          <nav className="flex gap-1">
+            {LINKS.map((link) => {
+              const active = pathname?.startsWith(link.href);
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    active
+                      ? "bg-slate-900 text-white"
+                      : "text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
+          <UserPicker users={users} currentUserId={currentUserId} />
+        </div>
       </div>
     </header>
   );

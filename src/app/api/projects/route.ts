@@ -3,10 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/current-user";
 import { createProjectSchema } from "@/lib/validation";
 
+// 프로젝트는 팀 공용: 모든 멤버가 같은 목록을 공유한다 (ownerId는 생성자 기록용).
 export async function GET() {
-  const user = await getCurrentUser();
   const projects = await prisma.project.findMany({
-    where: { ownerId: user.id },
     orderBy: { createdAt: "asc" },
     include: { _count: { select: { tasks: true } } },
   });

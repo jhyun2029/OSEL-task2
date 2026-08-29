@@ -44,3 +44,6 @@ next-env.d.ts
 # local SQLite database
 /prisma/*.db
 /prisma/*.db-journal
+
+# editor / agent tooling
+.claude/

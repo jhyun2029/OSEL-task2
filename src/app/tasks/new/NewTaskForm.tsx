@@ -14,6 +14,7 @@ export default function NewTaskForm({ projects }: { projects: ProjectDto[] }) {
   const [tags, setTags] = useState("");
   const [projectId, setProjectId] = useState("");
   const [importance, setImportance] = useState("NORMAL");
+  const [visibility, setVisibility] = useState("TEAM_SHARED");
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [steps, setSteps] = useState<DraftStep[]>([]);
@@ -49,6 +50,7 @@ export default function NewTaskForm({ projects }: { projects: ProjectDto[] }) {
         tags: tags || null,
         projectId: projectId || null,
         importance,
+        visibility,
         startDate: startDate || null,
         dueDate: dueDate || null,
         planSteps: steps
@@ -133,9 +135,13 @@ export default function NewTaskForm({ projects }: { projects: ProjectDto[] }) {
           </select>
         </Field>
         <Field label="공개범위">
-          <select className="input" disabled defaultValue="PRIVATE">
-            <option value="PRIVATE">개인 전용</option>
-            <option value="TEAM_SHARED">팀 공유 (준비 중)</option>
+          <select
+            className="input"
+            value={visibility}
+            onChange={(e) => setVisibility(e.target.value)}
+          >
+            <option value="TEAM_SHARED">팀 공유 (모두 볼 수 있음)</option>
+            <option value="PRIVATE">개인 전용 (나만 볼 수 있음)</option>
           </select>
         </Field>
       </div>

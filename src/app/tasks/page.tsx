@@ -1,13 +1,20 @@
 import Link from "next/link";
-import { listProjectsForCurrentUser, listTasksForCurrentUser } from "@/lib/data";
+import {
+  listProjectsForCurrentUser,
+  listTasksForCurrentUser,
+  listUsers,
+} from "@/lib/data";
+import { getCurrentUser } from "@/lib/current-user";
 import TaskListClient from "./TaskListClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function TasksPage() {
-  const [tasks, projects] = await Promise.all([
+  const [tasks, projects, users, currentUser] = await Promise.all([
     listTasksForCurrentUser(),
     listProjectsForCurrentUser(),
+    listUsers(),
+    getCurrentUser(),
   ]);
 
   return (
@@ -21,7 +28,12 @@ export default async function TasksPage() {
           + 새 업무
         </Link>
       </div>
-      <TaskListClient initialTasks={tasks} projects={projects} />
+      <TaskListClient
+        initialTasks={tasks}
+        projects={projects}
+        users={users}
+        currentUserId={currentUser.id}
+      />
     </div>
   );
 }

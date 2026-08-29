@@ -10,12 +10,14 @@ import type { ActivityType, Importance, TaskStatus, Visibility } from "@/lib/enu
 
 export const taskInclude = {
   project: true,
+  owner: { select: { id: true, name: true } },
   planSteps: { orderBy: { order: "asc" as const } },
   activityLogs: { orderBy: { createdAt: "desc" as const }, take: 20 },
 };
 
 export type TaskWithRelations = Task & {
   project: Project | null;
+  owner: { id: string; name: string };
   planSteps: PlanStep[];
   activityLogs: ActivityLog[];
 };

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { TaskDto, ProjectDto } from "@/lib/types";
+import type { TaskDto, ProjectDto, UserDto } from "@/lib/types";
 import type { TaskStatus } from "@/lib/enums";
 import {
   IMPORTANCE_LABELS,
@@ -16,23 +16,34 @@ import { ImportanceBadge, ProgressBar, StatusBadge } from "@/components/Badges";
 type Props = {
   initialTasks: TaskDto[];
   projects: ProjectDto[];
+  users: UserDto[];
+  currentUserId: string;
 };
 
 const ALL = "ALL";
 
-export default function TaskListClient({ initialTasks, projects }: Props) {
+export default function TaskListClient({
+  initialTasks,
+  projects,
+  users,
+  currentUserId,
+}: Props) {
   const router = useRouter();
   const [tasks, setTasks] = useState(initialTasks);
   const [statusFilter, setStatusFilter] = useState<string>(ALL);
   const [importanceFilter, setImportanceFilter] = useState<string>(ALL);
   const [projectFilter, setProjectFilter] = useState<string>(ALL);
+  const [ownerFilter, setOwnerFilter] = useState<string>(ALL);
   const [pending, setPending] = useState<string | null>(null);
+  // confirm() 팝업을 지원하지 않는 환경이 있어 "한 번 더 클릭" 방식으로 확인.
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     return tasks.filter((t) => {
       if (statusFilter !== ALL && t.status !== statusFilter) return false;
       if (importanceFilter !== ALL && t.importance !== importanceFilter)
         return false;
+      if (ownerFilter !== ALL && t.ownerId !== ownerFilter) return false;
       if (projectFilter !== ALL) {
         if (projectFilter === "NONE" && t.projectId) return false;
         if (projectFilter !== "NONE" && t.projectId !== projectFilter)
@@ -40,7 +51,7 @@ export default function TaskListClient({ initialTasks, projects }: Props) {
       }
       return true;
     });
-  }, [tasks, statusFilter, importanceFilter, projectFilter]);
+  }, [tasks, statusFilter, importanceFilter, projectFilter, ownerFilter]);
 
   async function updateStatus(id: string, status: TaskStatus) {
     setPending(id);
@@ -57,7 +68,12 @@ export default function TaskListClient({ initialTasks, projects }: Props) {
   }
 
   async function deleteTask(id: string) {
-    if (!confirm("이 업무를 삭제할까요? 되돌릴 수 없습니다.")) return;
+    if (confirmingId !== id) {
+      setConfirmingId(id);
+      setTimeout(() => setConfirmingId((c) => (c === id ? null : c)), 3000);
+      return;
+    }
+    setConfirmingId(null);
     setPending(id);
     const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
     if (res.ok) {
@@ -104,6 +120,18 @@ export default function TaskListClient({ initialTasks, projects }: Props) {
             ...projects.map((p) => ({ value: p.id, label: p.name })),
           ]}
         />
+        <FilterSelect
+          label="연구원"
+          value={ownerFilter}
+          onChange={setOwnerFilter}
+          options={[
+            { value: ALL, label: "전체" },
+            ...users.map((u) => ({
+              value: u.id,
+              label: u.id === currentUserId ? `${u.name} (나)` : u.name,
+            })),
+          ]}
+        />
       </div>
 
       {filtered.length === 0 ? (
@@ -127,6 +155,20 @@ export default function TaskListClient({ initialTasks, projects }: Props) {
                   {task.title}
                 </Link>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                  <span
+                    className={`rounded-full px-2 py-0.5 ${
+                      task.ownerId === currentUserId
+                        ? "bg-indigo-100 text-indigo-700 border border-indigo-200"
+                        : "bg-slate-100 text-slate-600 border border-slate-200"
+                    }`}
+                  >
+                    {task.owner.name}
+                  </span>
+                  {task.visibility === "PRIVATE" && (
+                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700">
+                      개인 전용
+                    </span>
+                  )}
                   <ImportanceBadge value={task.importance} />
                   <StatusBadge value={task.status} />
                   {task.project && (
@@ -144,28 +186,38 @@ export default function TaskListClient({ initialTasks, projects }: Props) {
                 <ProgressBar value={task.progress} />
               </div>
 
-              <select
-                className="rounded-md border border-slate-300 px-2 py-1 text-xs"
-                value={task.status}
-                disabled={pending === task.id}
-                onChange={(e) =>
-                  updateStatus(task.id, e.target.value as TaskStatus)
-                }
-              >
-                {TASK_STATUS_ORDER.map((s) => (
-                  <option key={s} value={s}>
-                    {TASK_STATUS_LABELS[s]}
-                  </option>
-                ))}
-              </select>
+              {task.ownerId === currentUserId ? (
+                <>
+                  <select
+                    className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+                    value={task.status}
+                    disabled={pending === task.id}
+                    onChange={(e) =>
+                      updateStatus(task.id, e.target.value as TaskStatus)
+                    }
+                  >
+                    {TASK_STATUS_ORDER.map((s) => (
+                      <option key={s} value={s}>
+                        {TASK_STATUS_LABELS[s]}
+                      </option>
+                    ))}
+                  </select>
 
-              <button
-                onClick={() => deleteTask(task.id)}
-                disabled={pending === task.id}
-                className="text-xs font-medium text-red-600 hover:underline"
-              >
-                삭제
-              </button>
+                  <button
+                    onClick={() => deleteTask(task.id)}
+                    disabled={pending === task.id}
+                    className={`text-xs font-medium hover:underline ${
+                      confirmingId === task.id
+                        ? "rounded bg-red-600 px-2 py-0.5 text-white"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {confirmingId === task.id ? "정말 삭제?" : "삭제"}
+                  </button>
+                </>
+              ) : (
+                <span className="text-xs text-slate-400">읽기 전용</span>
+              )}
             </li>
           ))}
         </ul>

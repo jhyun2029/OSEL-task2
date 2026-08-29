@@ -18,8 +18,13 @@ async function loadOwnedTask(id: string, ownerId: string) {
 export async function GET(_req: NextRequest, { params }: Params) {
   const { id } = await params;
   const user = await getCurrentUser();
+  // 조회는 팀 공유 규칙(내 것 전부 + 남의 TEAM_SHARED)을 따르고,
+  // 수정/삭제(PATCH/DELETE)는 소유자만 가능하다(loadOwnedTask).
   const task = (await prisma.task.findFirst({
-    where: { id, ownerId: user.id },
+    where: {
+      id,
+      OR: [{ ownerId: user.id }, { visibility: "TEAM_SHARED" }],
+    },
     include: taskInclude,
   })) as TaskWithRelations | null;
 

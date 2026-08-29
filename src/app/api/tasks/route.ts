@@ -18,10 +18,16 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get("status");
   const importance = searchParams.get("importance");
   const projectId = searchParams.get("projectId");
+  const ownerId = searchParams.get("ownerId");
   const from = searchParams.get("from");
   const to = searchParams.get("to");
 
-  const where: Prisma.TaskWhereInput = { ownerId: user.id };
+  // 팀 공유 규칙: 내 업무는 전부, 남의 업무는 TEAM_SHARED만 보인다.
+  // ownerId 필터는 이 규칙과 AND로 결합되므로 남의 PRIVATE는 새지 않는다.
+  const where: Prisma.TaskWhereInput = {
+    OR: [{ ownerId: user.id }, { visibility: "TEAM_SHARED" }],
+  };
+  if (ownerId) where.ownerId = ownerId;
   if (status) where.status = status as TaskStatus;
   if (importance) where.importance = importance as Importance;
   if (projectId) where.projectId = projectId;
