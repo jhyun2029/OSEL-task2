@@ -7,12 +7,19 @@ import { IMPORTANCE_LABELS, IMPORTANCE_ORDER } from "@/lib/constants";
 
 type DraftStep = { title: string; plannedStartDate: string; plannedEndDate: string };
 
+const NEW_PROJECT = "__new__";
+
 export default function NewTaskForm({ projects }: { projects: ProjectDto[] }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
   const [projectId, setProjectId] = useState("");
+  // 드롭다운에서 "+ 새 프로젝트 만들기" 선택 시 인라인 입력으로 즉석 생성.
+  const [projectList, setProjectList] = useState(projects);
+  const [addingProject, setAddingProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [projectBusy, setProjectBusy] = useState(false);
   const [importance, setImportance] = useState("NORMAL");
   const [visibility, setVisibility] = useState("TEAM_SHARED");
   const [startDate, setStartDate] = useState("");
@@ -31,6 +38,28 @@ export default function NewTaskForm({ projects }: { projects: ProjectDto[] }) {
 
   function removeStep(i: number) {
     setSteps((s) => s.filter((_, idx) => idx !== i));
+  }
+
+  async function createProject() {
+    const name = newProjectName.trim();
+    if (!name || projectBusy) return;
+    setProjectBusy(true);
+    setError(null);
+    const res = await fetch("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    setProjectBusy(false);
+    if (!res.ok) {
+      setError("프로젝트를 만들지 못했습니다.");
+      return;
+    }
+    const created: ProjectDto = await res.json();
+    setProjectList((prev) => [...prev, created]);
+    setProjectId(created.id);
+    setAddingProject(false);
+    setNewProjectName("");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -105,18 +134,68 @@ export default function NewTaskForm({ projects }: { projects: ProjectDto[] }) {
           />
         </Field>
         <Field label="프로젝트">
-          <select
-            className="input"
-            value={projectId}
-            onChange={(e) => setProjectId(e.target.value)}
-          >
-            <option value="">미분류</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          {addingProject ? (
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                className="input flex-1"
+                placeholder="새 프로젝트 이름"
+                value={newProjectName}
+                disabled={projectBusy}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    createProject();
+                  }
+                  if (e.key === "Escape") {
+                    setAddingProject(false);
+                    setNewProjectName("");
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={createProject}
+                disabled={projectBusy || !newProjectName.trim()}
+                className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-40"
+              >
+                만들기
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddingProject(false);
+                  setNewProjectName("");
+                }}
+                disabled={projectBusy}
+                className="text-xs text-slate-500 hover:underline"
+              >
+                취소
+              </button>
+            </div>
+          ) : (
+            <select
+              className="input"
+              value={projectId}
+              onChange={(e) => {
+                if (e.target.value === NEW_PROJECT) {
+                  e.target.value = projectId;
+                  setAddingProject(true);
+                  return;
+                }
+                setProjectId(e.target.value);
+              }}
+            >
+              <option value="">미분류</option>
+              {projectList.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+              <option value={NEW_PROJECT}>+ 새 프로젝트 만들기...</option>
+            </select>
+          )}
         </Field>
       </div>
 
