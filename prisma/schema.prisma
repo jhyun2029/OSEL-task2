@@ -28,6 +28,7 @@ model User {
   name      String
   // 전체 관리자(연구실 책임자). 멤버 삭제 등 관리 기능은 isAdmin만 가능.
   isAdmin   Boolean   @default(false)
+  sortOrder Int       @default(0) // 멤버 목록 드래그 정렬용 (관리자가 지정)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -44,6 +45,7 @@ model Project {
   name        String
   description String?
   color       String?  // for calendar/list UI badges
+  sortOrder   Int      @default(0) // 목록 드래그 정렬용 (팀 공용 순서)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -84,6 +86,8 @@ model Task {
   dueDate   DateTime?
 
   visibility String @default("PRIVATE")
+
+  sortOrder Int @default(0) // 할 일 목록 드래그 정렬용 (팀 공용 순서)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

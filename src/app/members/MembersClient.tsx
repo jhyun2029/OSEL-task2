@@ -24,6 +24,32 @@ export default function MembersClient({
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 드래그 정렬: 드래그 중에는 로컬 순서만 바꾸고 드롭 시 한 번만 저장.
+  const [dragId, setDragId] = useState<string | null>(null);
+
+  function moveLocal(fromId: string, toId: string) {
+    if (fromId === toId) return;
+    setMembers((prev) => {
+      const next = [...prev];
+      const from = next.findIndex((m) => m.id === fromId);
+      const to = next.findIndex((m) => m.id === toId);
+      if (from < 0 || to < 0) return prev;
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }
+
+  async function commitOrder() {
+    if (!dragId) return;
+    setDragId(null);
+    await fetch("/api/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order: members.map((m) => m.id) }),
+    });
+    router.refresh();
+  }
 
   async function deleteMember(m: Member) {
     if (confirmingId !== m.id) {
@@ -58,10 +84,28 @@ export default function MembersClient({
           return (
             <li
               key={m.id}
+              draggable
+              onDragStart={(e) => {
+                setDragId(m.id);
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (dragId) moveLocal(dragId, m.id);
+              }}
+              onDrop={(e) => e.preventDefault()}
+              onDragEnd={commitOrder}
               className={`flex items-center gap-3 p-4 ${
-                pending === m.id ? "opacity-50" : ""
-              }`}
+                dragId === m.id ? "bg-slate-50 opacity-60" : ""
+              } ${pending === m.id ? "opacity-50" : ""}`}
             >
+              <span
+                className="cursor-grab select-none text-slate-300 active:cursor-grabbing"
+                title="드래그해서 순서 변경"
+                aria-hidden
+              >
+                ⠿
+              </span>
               <div className="min-w-0 flex-1">
                 <span className="font-medium text-slate-900">{m.name}</span>
                 {m.isAdmin && (

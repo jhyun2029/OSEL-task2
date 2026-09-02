@@ -37,6 +37,32 @@ export default function TaskListClient({
   const [pending, setPending] = useState<string | null>(null);
   // confirm() 팝업을 지원하지 않는 환경이 있어 "한 번 더 클릭" 방식으로 확인.
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  // 드래그 정렬: 드래그 중에는 로컬 순서만 바꾸고 드롭 시 한 번만 저장.
+  // 필터가 걸려 있어도 보이는 업무들끼리 순서를 바꿀 수 있다.
+  const [dragId, setDragId] = useState<string | null>(null);
+
+  function moveLocal(fromId: string, toId: string) {
+    if (fromId === toId) return;
+    setTasks((prev) => {
+      const next = [...prev];
+      const from = next.findIndex((t) => t.id === fromId);
+      const to = next.findIndex((t) => t.id === toId);
+      if (from < 0 || to < 0) return prev;
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }
+
+  async function commitOrder(visibleIds: string[]) {
+    if (!dragId) return;
+    setDragId(null);
+    await fetch("/api/tasks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order: visibleIds }),
+    });
+  }
 
   const filtered = useMemo(() => {
     return tasks.filter((t) => {
@@ -143,10 +169,28 @@ export default function TaskListClient({
           {filtered.map((task) => (
             <li
               key={task.id}
+              draggable
+              onDragStart={(e) => {
+                setDragId(task.id);
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (dragId) moveLocal(dragId, task.id);
+              }}
+              onDrop={(e) => e.preventDefault()}
+              onDragEnd={() => commitOrder(filtered.map((t) => t.id))}
               className={`flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:gap-4 ${
-                pending === task.id ? "opacity-50" : ""
-              }`}
+                dragId === task.id ? "bg-slate-50 opacity-60" : ""
+              } ${pending === task.id ? "opacity-50" : ""}`}
             >
+              <span
+                className="hidden cursor-grab select-none text-slate-300 active:cursor-grabbing sm:inline"
+                title="드래그해서 순서 변경"
+                aria-hidden
+              >
+                ⠿
+              </span>
               <div className="min-w-0 flex-1">
                 <Link
                   href={`/tasks/${task.id}`}

@@ -69,10 +69,11 @@ export const createPlanStepSchema = z.object({
   plannedEndDate: dateLike.optional().nullable(),
 });
 
-// 드래그 정렬: 해당 업무의 전체 단계 id를 새 순서대로 나열한 배열.
-export const reorderPlanStepsSchema = z.object({
+// 드래그 정렬 공용: id 배열을 새 순서대로 나열.
+export const reorderIdsSchema = z.object({
   order: z.array(z.string().min(1)).min(1),
 });
+export const reorderPlanStepsSchema = reorderIdsSchema;
 
 export const updatePlanStepSchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),

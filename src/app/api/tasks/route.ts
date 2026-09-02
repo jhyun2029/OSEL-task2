@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/current-user";
-import { createTaskSchema } from "@/lib/validation";
+import { createTaskSchema, reorderIdsSchema } from "@/lib/validation";
 import { taskInclude, toTaskDto, type TaskWithRelations } from "@/lib/task-dto";
 import { activityEntry } from "@/lib/activity";
 import type { Prisma } from "@prisma/client";
@@ -44,10 +44,45 @@ export async function GET(req: NextRequest) {
   const tasks = (await prisma.task.findMany({
     where,
     include: taskInclude,
-    orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+    orderBy: [{ sortOrder: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
   })) as TaskWithRelations[];
 
   return NextResponse.json(tasks.map(toTaskDto));
+}
+
+// PATCH /api/tasks — 할 일 목록 드래그 정렬. body: { order: [taskId, ...] }
+// (필터가 걸린 화면에서도 쓸 수 있게, 보이는 업무들끼리만 서로 자리를
+// 바꾸는 방식: 대상들의 기존 sortOrder 값 집합을 새 순서대로 재배정)
+export async function PATCH(req: NextRequest) {
+  const user = await getCurrentUser();
+  const body = await req.json().catch(() => null);
+  const parsed = reorderIdsSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+  const ids = parsed.data.order;
+
+  const targets = await prisma.task.findMany({
+    where: {
+      id: { in: ids },
+      OR: [{ ownerId: user.id }, { visibility: "TEAM_SHARED" }],
+    },
+    select: { id: true, sortOrder: true },
+  });
+  if (targets.length !== ids.length || new Set(ids).size !== ids.length) {
+    return NextResponse.json(
+      { error: "order에 유효하지 않은 업무가 포함되어 있습니다." },
+      { status: 400 }
+    );
+  }
+
+  const slots = targets.map((t) => t.sortOrder).sort((a, b) => a - b);
+  await prisma.$transaction(
+    ids.map((id, i) =>
+      prisma.task.update({ where: { id }, data: { sortOrder: slots[i] } })
+    )
+  );
+  return NextResponse.json({ ok: true });
 }
 
 // POST /api/tasks — create a task, optionally seeded with plan steps.
@@ -63,9 +98,12 @@ export async function POST(req: NextRequest) {
   }
   const { planSteps, ...data } = parsed.data;
 
+  const maxSort = await prisma.task.aggregate({ _max: { sortOrder: true } });
+
   const task = await prisma.$transaction(async (tx) => {
     const created = await tx.task.create({
       data: {
+        sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
         title: data.title,
         description: data.description ?? null,
         tags: data.tags ?? null,

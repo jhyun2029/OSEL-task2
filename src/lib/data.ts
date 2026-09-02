@@ -20,7 +20,7 @@ export async function listTasksForCurrentUser() {
   const tasks = (await prisma.task.findMany({
     where: visibleTo(user.id),
     include: taskInclude,
-    orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+    orderBy: [{ sortOrder: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }],
   })) as TaskWithRelations[];
   return tasks.map(toTaskDto);
 }
@@ -37,7 +37,7 @@ export async function getTaskForCurrentUser(id: string) {
 // 프로젝트는 팀 공용: 모든 멤버가 같은 목록을 보고 함께 분류에 쓴다.
 export async function listProjectsForCurrentUser() {
   const projects = await prisma.project.findMany({
-    orderBy: { createdAt: "asc" },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     include: { _count: { select: { tasks: true } } },
   });
   return projects.map(toProjectDto);
@@ -45,7 +45,7 @@ export async function listProjectsForCurrentUser() {
 
 export async function listUsers() {
   return prisma.user.findMany({
-    orderBy: { createdAt: "asc" },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     select: { id: true, name: true, isAdmin: true },
   });
 }
@@ -53,7 +53,7 @@ export async function listUsers() {
 // 멤버 관리 화면용: 업무 수 포함 목록.
 export async function listUsersWithTaskCounts() {
   return prisma.user.findMany({
-    orderBy: { createdAt: "asc" },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,
       name: true,
