@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { TaskDto, ProjectDto } from "@/lib/types";
+import type { TaskDto, ProjectDto, UserDto } from "@/lib/types";
 import {
   ACTIVITY_TYPE_LABELS,
   IMPORTANCE_LABELS,
@@ -20,17 +20,68 @@ function toDateInput(value: string | null) {
 export default function TaskDetailClient({
   initialTask,
   projects,
+  users,
   readOnly = false,
+  isAdmin = false,
 }: {
   initialTask: TaskDto;
   projects: ProjectDto[];
+  users: UserDto[];
   readOnly?: boolean;
+  isAdmin?: boolean;
 }) {
   const router = useRouter();
   const [task, setTask] = useState(initialTask);
   const [savingField, setSavingField] = useState<string | null>(null);
   // confirm() 팝업을 지원하지 않는 환경이 있어 "한 번 더 클릭" 방식으로 확인.
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [copying, setCopying] = useState(false);
+
+  // 관리자 전용: 업무 소유자 이관 (readOnly와 무관하게 동작해야 하므로
+  // patchTask를 거치지 않는다).
+  async function transferOwner(ownerId: string) {
+    if (!ownerId || ownerId === task.ownerId) return;
+    setSavingField("owner");
+    const res = await fetch(`/api/tasks/${task.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ownerId }),
+    });
+    setSavingField(null);
+    // 이관하면 열람/수정 권한이 달라질 수 있으므로 전체 새로고침으로 재평가
+    if (res.ok) window.location.reload();
+  }
+
+  // 다른 멤버의 업무를 내 소유의 새 업무로 복제 (하위 단계 포함, 진행상태는 초기화)
+  async function copyToMine() {
+    if (copying) return;
+    setCopying(true);
+    const res = await fetch("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: `${task.title} (복사)`,
+        description: task.description,
+        tags: task.tags,
+        projectId: task.projectId,
+        importance: task.importance,
+        visibility: task.visibility,
+        startDate: task.startDate,
+        dueDate: task.dueDate,
+        planSteps: task.planSteps.map((s) => ({
+          title: s.title,
+          plannedStartDate: s.plannedStartDate,
+          plannedEndDate: s.plannedEndDate,
+        })),
+      }),
+    });
+    setCopying(false);
+    if (res.ok) {
+      const created: TaskDto = await res.json();
+      router.push(`/tasks/${created.id}`);
+      router.refresh();
+    }
+  }
 
   async function patchTask(patch: Record<string, unknown>, field: string) {
     if (readOnly) return;
@@ -68,10 +119,38 @@ export default function TaskDetailClient({
           ← 목록으로
         </Link>
         <div className="flex items-center gap-3">
-          <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-            {task.owner.name}
-            {readOnly && " · 읽기 전용"}
-          </span>
+          {isAdmin ? (
+            <label className="flex items-center gap-1 text-xs text-slate-500">
+              소유자
+              <select
+                className="rounded-md border border-slate-300 bg-white px-1.5 py-0.5 text-xs"
+                value={task.ownerId}
+                disabled={savingField === "owner"}
+                onChange={(e) => transferOwner(e.target.value)}
+                title="관리자: 업무를 다른 멤버에게 이관"
+              >
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+              {task.owner.name}
+              {readOnly && " · 읽기 전용"}
+            </span>
+          )}
+          {readOnly && (
+            <button
+              onClick={copyToMine}
+              disabled={copying}
+              className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+            >
+              {copying ? "복사 중..." : "내 업무로 복사"}
+            </button>
+          )}
           {!readOnly && (
             <button
               onClick={deleteTask}

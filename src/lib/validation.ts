@@ -50,6 +50,8 @@ export const createTaskSchema = z.object({
 // 전 필드 optional로 명시한다.
 export const updateTaskSchema = z.object({
   title: z.string().trim().min(1, "제목을 입력하세요").max(200).optional(),
+  // 소유자 이관: 관리자 전용 (route에서 권한 검사)
+  ownerId: z.string().min(1).optional(),
   description: z.string().trim().max(5000).optional().nullable(),
   tags: z.string().trim().max(500).optional().nullable(),
   projectId: z.string().min(1).optional().nullable(),
