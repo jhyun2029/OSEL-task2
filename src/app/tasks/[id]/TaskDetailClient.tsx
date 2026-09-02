@@ -88,8 +88,14 @@ export default function TaskDetailClient({
       </div>
 
       <section className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
+        {!readOnly && (
+          <p className="text-xs text-slate-400">
+            ✏️ 제목·설명을 비롯한 모든 항목은 클릭해서 바로 수정할 수 있습니다.
+            수정하면 자동 저장됩니다.
+          </p>
+        )}
         <input
-          className="w-full border-none bg-transparent text-2xl font-semibold outline-none"
+          className="-mx-1 w-full rounded-md border border-transparent bg-transparent px-1 text-2xl font-semibold outline-none transition-colors hover:border-slate-200 focus:border-slate-300"
           value={task.title}
           disabled={readOnly}
           onChange={(e) => setTask({ ...task, title: e.target.value })}
@@ -267,6 +273,35 @@ function PlanStepsSection({
   // 드래그 중인 단계 id. 드래그하는 동안에는 로컬 순서만 바꾸고(미리보기),
   // 드롭이 끝나면 최종 순서를 한 번만 서버에 저장한다.
   const [dragId, setDragId] = useState<string | null>(null);
+  // 수정 중인 단계와 임시 입력값. 저장을 눌러야 서버에 반영된다.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState({ title: "", start: "", end: "" });
+
+  function startEdit(step: TaskDto["planSteps"][number]) {
+    setEditingId(step.id);
+    setEditDraft({
+      title: step.title,
+      start: toDateInput(step.plannedStartDate),
+      end: toDateInput(step.plannedEndDate),
+    });
+  }
+
+  async function saveEdit() {
+    if (!editingId || !editDraft.title.trim()) return;
+    setBusyId(editingId);
+    await fetch(`/api/tasks/${task.id}/plan-steps/${editingId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: editDraft.title.trim(),
+        plannedStartDate: editDraft.start || null,
+        plannedEndDate: editDraft.end || null,
+      }),
+    });
+    setEditingId(null);
+    await refresh();
+    setBusyId(null);
+  }
 
   async function refresh() {
     const res = await fetch(`/api/tasks/${task.id}`);
@@ -371,21 +406,77 @@ function PlanStepsSection({
               onChange={(e) => toggleStep(step.id, e.target.checked)}
               className="size-4"
             />
-            <span className={`flex-1 text-sm ${step.isDone ? "text-slate-400 line-through" : ""}`}>
-              {step.title}
-            </span>
-            {(step.plannedStartDate || step.plannedEndDate) && (
-              <span className="text-xs text-slate-400">
-                {toDateInput(step.plannedStartDate)} ~ {toDateInput(step.plannedEndDate)}
-              </span>
-            )}
-            {!readOnly && (
-              <button
-                onClick={() => removeStep(step.id)}
-                className="text-xs text-red-600 hover:underline"
-              >
-                삭제
-              </button>
+            {editingId === step.id ? (
+              <div className="flex flex-1 flex-wrap items-center gap-2">
+                <input
+                  autoFocus
+                  className="input min-w-32 flex-1"
+                  value={editDraft.title}
+                  onChange={(e) =>
+                    setEditDraft((d) => ({ ...d, title: e.target.value }))
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveEdit();
+                    if (e.key === "Escape") setEditingId(null);
+                  }}
+                />
+                <input
+                  type="date"
+                  className="input w-36"
+                  value={editDraft.start}
+                  onChange={(e) =>
+                    setEditDraft((d) => ({ ...d, start: e.target.value }))
+                  }
+                />
+                <input
+                  type="date"
+                  className="input w-36"
+                  value={editDraft.end}
+                  onChange={(e) =>
+                    setEditDraft((d) => ({ ...d, end: e.target.value }))
+                  }
+                />
+                <button
+                  onClick={saveEdit}
+                  disabled={!editDraft.title.trim()}
+                  className="rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-40"
+                >
+                  저장
+                </button>
+                <button
+                  onClick={() => setEditingId(null)}
+                  className="text-xs text-slate-500 hover:underline"
+                >
+                  취소
+                </button>
+              </div>
+            ) : (
+              <>
+                <span className={`flex-1 text-sm ${step.isDone ? "text-slate-400 line-through" : ""}`}>
+                  {step.title}
+                </span>
+                {(step.plannedStartDate || step.plannedEndDate) && (
+                  <span className="text-xs text-slate-400">
+                    {toDateInput(step.plannedStartDate)} ~ {toDateInput(step.plannedEndDate)}
+                  </span>
+                )}
+                {!readOnly && (
+                  <>
+                    <button
+                      onClick={() => startEdit(step)}
+                      className="text-xs text-slate-500 hover:underline"
+                    >
+                      수정
+                    </button>
+                    <button
+                      onClick={() => removeStep(step.id)}
+                      className="text-xs text-red-600 hover:underline"
+                    >
+                      삭제
+                    </button>
+                  </>
+                )}
+              </>
             )}
           </li>
         ))}
