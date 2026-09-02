@@ -2,14 +2,24 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { ProjectDto } from "@/lib/types";
+import type { ProjectDto, TaskDto } from "@/lib/types";
 import { IMPORTANCE_LABELS, IMPORTANCE_ORDER } from "@/lib/constants";
 
 type DraftStep = { title: string; plannedStartDate: string; plannedEndDate: string };
 
 const NEW_PROJECT = "__new__";
 
-export default function NewTaskForm({ projects }: { projects: ProjectDto[] }) {
+function toDateInput(value: string | null) {
+  return value ? value.slice(0, 10) : "";
+}
+
+export default function NewTaskForm({
+  projects,
+  existingTasks = [],
+}: {
+  projects: ProjectDto[];
+  existingTasks?: TaskDto[];
+}) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -27,6 +37,33 @@ export default function NewTaskForm({ projects }: { projects: ProjectDto[] }) {
   const [steps, setSteps] = useState<DraftStep[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // "기존 업무에서 복사": 선택한 업무의 내용을 입력창에 채워 넣고
+  // 사용자가 수정 후 저장하는 템플릿 방식.
+  const [copySourceId, setCopySourceId] = useState<string | null>(null);
+  const [copiedFrom, setCopiedFrom] = useState<string | null>(null);
+
+  function copyFromExisting() {
+    const src = existingTasks.find((t) => t.id === copySourceId);
+    if (!src) return;
+    setTitle(src.title);
+    setDescription(src.description ?? "");
+    setTags(src.tags ?? "");
+    setProjectId(src.projectId ?? "");
+    setImportance(src.importance);
+    setVisibility(src.visibility);
+    setStartDate(toDateInput(src.startDate));
+    setDueDate(toDateInput(src.dueDate));
+    setSteps(
+      src.planSteps.map((s) => ({
+        title: s.title,
+        plannedStartDate: toDateInput(s.plannedStartDate),
+        plannedEndDate: toDateInput(s.plannedEndDate),
+      }))
+    );
+    setCopiedFrom(`"${src.title}" (${src.owner.name})`);
+    setError(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   function addStep() {
     setSteps((s) => [...s, { title: "", plannedStartDate: "", plannedEndDate: "" }]);
@@ -295,6 +332,52 @@ export default function NewTaskForm({ projects }: { projects: ProjectDto[] }) {
           {submitting ? "저장 중..." : "업무 저장"}
         </button>
       </div>
+
+      {existingTasks.length > 0 && (
+        <div className="space-y-2 border-t border-slate-200 pt-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-700">
+              기존 업무에서 복사
+            </span>
+            <button
+              type="button"
+              onClick={copyFromExisting}
+              disabled={!copySourceId}
+              className="rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+            >
+              선택한 업무 내용 가져오기
+            </button>
+          </div>
+          <p className="text-xs text-slate-400">
+            업무를 선택하고 버튼을 누르면 위 입력창에 내용이 채워집니다. 필요한
+            부분만 수정한 뒤 저장하세요. (진행 상태는 복사되지 않습니다)
+          </p>
+          {copiedFrom && (
+            <p className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">
+              {copiedFrom} 업무의 내용을 가져왔습니다. 수정 후 저장하세요.
+            </p>
+          )}
+          <ul className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-slate-200 p-2">
+            {existingTasks.map((t) => (
+              <li key={t.id}>
+                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-slate-50">
+                  <input
+                    type="radio"
+                    name="copySource"
+                    checked={copySourceId === t.id}
+                    onChange={() => setCopySourceId(t.id)}
+                    className="size-3.5"
+                  />
+                  <span className="flex-1 truncate text-slate-800">{t.title}</span>
+                  <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-500">
+                    {t.owner.name}
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </form>
   );
 }
