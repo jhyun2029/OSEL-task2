@@ -11,8 +11,11 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  // Vercel + Neon(Postgres)으로 이전 (2026-09). 로컬 SQLite 시절의 String
+  // "enum" 컬럼들은 호환을 위해 그대로 유지한다 (값 검증은 앱 레벨).
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 // A single researcher. The MVP is single-user-per-workspace in practice

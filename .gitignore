@@ -47,3 +47,7 @@ next-env.d.ts
 
 # editor / agent tooling
 .claude/
+
+# migration artifacts
+migration-data.json
+*.tmp.js
