@@ -12,6 +12,9 @@ export default function ProjectsClient({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // confirm() 팝업 미지원 환경 대응: "한 번 더 클릭" 확인 방식.
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function addProject(e: React.FormEvent) {
     e.preventDefault();
@@ -32,13 +35,29 @@ export default function ProjectsClient({
   }
 
   async function deleteProject(id: string) {
-    if (!confirm("이 프로젝트를 삭제할까요? 소속 업무는 미분류로 남습니다.")) return;
+    if (confirmingId !== id) {
+      setConfirmingId(id);
+      setError(null);
+      setTimeout(() => setConfirmingId((c) => (c === id ? null : c)), 4000);
+      return;
+    }
+    setConfirmingId(null);
     const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
-    if (res.ok) setProjects((prev) => prev.filter((p) => p.id !== id));
+    if (res.ok) {
+      setProjects((prev) => prev.filter((p) => p.id !== id));
+      return;
+    }
+    const data = await res.json().catch(() => null);
+    setError(
+      typeof data?.error === "string" ? data.error : "프로젝트를 삭제하지 못했습니다."
+    );
   }
 
   return (
     <div className="space-y-4">
+      {error && (
+        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+      )}
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200 bg-white">
         {projects.length === 0 && (
           <li className="p-4 text-sm text-slate-400">등록된 프로젝트가 없습니다.</li>
@@ -52,9 +71,15 @@ export default function ProjectsClient({
             </div>
             <button
               onClick={() => deleteProject(p.id)}
-              className="shrink-0 text-xs font-medium text-red-600 hover:underline"
+              className={`shrink-0 text-xs font-medium hover:underline ${
+                confirmingId === p.id
+                  ? "rounded bg-red-600 px-2 py-1 text-white"
+                  : "text-red-600"
+              }`}
             >
-              삭제
+              {confirmingId === p.id
+                ? `정말 삭제? (업무 ${p._count?.tasks ?? 0}건은 미분류로 이동)`
+                : "삭제"}
             </button>
           </li>
         ))}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { UserDto } from "@/lib/types";
 import UserPicker from "@/components/UserPicker";
+import Clock from "@/components/Clock";
 
 const LINKS = [
   { href: "/tasks", label: "할 일 목록" },
@@ -31,9 +32,12 @@ export default function NavBar({
   return (
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <Link href="/tasks" className="text-lg font-semibold text-slate-900">
-          연구원 업무 관리
-        </Link>
+        <div className="flex items-baseline gap-3">
+          <Link href="/tasks" className="text-lg font-semibold text-slate-900">
+            연구원 업무 관리
+          </Link>
+          <Clock />
+        </div>
         <div className="flex items-center gap-4">
           <nav className="flex gap-1">
             {links.map((link) => {
