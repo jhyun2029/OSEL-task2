@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true },
+    select: { id: true, name: true, isAdmin: true },
   });
   return NextResponse.json(users);
 }
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   // 이메일 로그인은 아직 없으므로 unique 제약을 채우기 위한 자리표시 값.
   const user = await prisma.user.create({
     data: { name, email: `member-${crypto.randomUUID()}@lab.local` },
-    select: { id: true, name: true },
+    select: { id: true, name: true, isAdmin: true },
   });
   return NextResponse.json(user, { status: 201 });
 }

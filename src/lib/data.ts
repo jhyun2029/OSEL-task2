@@ -46,6 +46,20 @@ export async function listProjectsForCurrentUser() {
 export async function listUsers() {
   return prisma.user.findMany({
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true },
+    select: { id: true, name: true, isAdmin: true },
+  });
+}
+
+// 멤버 관리 화면용: 업무 수 포함 목록.
+export async function listUsersWithTaskCounts() {
+  return prisma.user.findMany({
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      name: true,
+      isAdmin: true,
+      createdAt: true,
+      _count: { select: { tasks: true } },
+    },
   });
 }

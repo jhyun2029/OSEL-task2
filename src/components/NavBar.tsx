@@ -14,11 +14,16 @@ const LINKS = [
 export default function NavBar({
   users,
   currentUserId,
+  isAdmin,
 }: {
   users: UserDto[];
   currentUserId: string;
+  isAdmin: boolean;
 }) {
   const pathname = usePathname();
+  const links = isAdmin
+    ? [...LINKS, { href: "/members", label: "멤버 관리" }]
+    : LINKS;
 
   // 접속 코드 입력 화면에서는 멤버 이름 등이 노출되지 않게 내비게이션을 숨긴다.
   if (pathname === "/gate") return null;
@@ -31,7 +36,7 @@ export default function NavBar({
         </Link>
         <div className="flex items-center gap-4">
           <nav className="flex gap-1">
-            {LINKS.map((link) => {
+            {links.map((link) => {
               const active = pathname?.startsWith(link.href);
               return (
                 <Link

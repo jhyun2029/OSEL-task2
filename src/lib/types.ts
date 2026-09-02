@@ -45,6 +45,7 @@ export type ProjectDto = {
 export type UserDto = {
   id: string;
   name: string;
+  isAdmin: boolean;
 };
 
 export type TaskDto = {
@@ -62,7 +63,7 @@ export type TaskDto = {
   createdAt: string;
   updatedAt: string;
   ownerId: string;
-  owner: UserDto;
+  owner: { id: string; name: string };
   projectId: string | null;
   project: ProjectDto | null;
   planSteps: PlanStepDto[];
